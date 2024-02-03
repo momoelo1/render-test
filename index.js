@@ -29,45 +29,28 @@ const errorHandler = (error, request, response, next) => {
 
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id" });
+  } else if ((error.name = "ValidationError")) {
+    console.log(error.name);
+    return response.status(400).send({ error: error.message });
   }
 
   next(error);
 };
 
-let notes = [
-  {
-    id: 1,
-    content: "HTML is easy",
-    important: true,
-  },
-  {
-    id: 2,
-    content: "Browser can execute only JavaScript",
-    important: false,
-  },
-  {
-    id: 3,
-    content: "GET and POST are the most important methods of HTTP protocol",
-    important: true,
-  },
-];
-
-app.post("/api/notes", (request, response) => {
+app.post("/api/notes", (request, response, next) => {
   const body = request.body;
-  if (body.content === undefined) {
-    return response.status(400).json({
-      error: "content missing",
-    });
-  }
 
   const note = new Note({
     content: body.content,
     important: body.important || false,
   });
 
-  note.save().then((savedNote) => {
-    response.json(savedNote);
-  });
+  note
+    .save()
+    .then((savedNote) => {
+      response.json(savedNote);
+    })
+    .catch((error) => next(error));
 });
 
 app.get("/", (request, response) => {
@@ -100,24 +83,22 @@ app.delete("/api/notes/:id", (request, response, next) => {
     .catch((error) => next(error));
 });
 
-app.put('/api/notes/:id', (request, response, next) => {
+app.put("/api/notes/:id", (request, response, next) => {
+  const { content, important } = request.body;
 
-  const body = request.body
-
-  const note = {
-    content: body.content,
-    important: body.important
-  }
-
-
-  Note.findByIdAndUpdate(request.params.id, note,  { new: true }).then(updateNote => {
-    response.json(updateNote)
-  }).catch(error => next(error))
-})
-
-
+  Note.findByIdAndUpdate(
+    request.params.id,
+    { content, important },
+    { new: true, runValidators: true, context: "query" }
+  )
+    .then((updatedNote) => {
+      response.json(updatedNote);
+    })
+    .catch((error) => next(error));
+});
 
 app.use(unknownEndpoint);
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT;
